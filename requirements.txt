@@ -1,0 +1,45 @@
+# GPT-OSS MixLoRA Training Requirements
+# =====================================
+
+# Core ML Framework
+torch>=2.0.0
+transformers>=4.40.0
+datasets>=2.18.0
+accelerate>=0.27.0
+peft>=0.10.0
+
+# Training & Optimization
+# bitsandbytes is optional - only works on Linux with CUDA and Python 3.10+
+# Uncomment below if on Linux with GPU:
+# bitsandbytes>=0.42.0
+scipy>=1.11.0
+einops>=0.7.0
+
+# Evaluation
+lm-eval>=0.4.0
+
+# Logging & Tracking
+wandb>=0.16.0
+tqdm>=4.66.0
+
+# Modal Cloud (optional)
+modal>=0.62.0
+
+# HuggingFace Hub
+huggingface_hub>=0.21.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Utilities
+pyyaml>=6.0.0
+python-dotenv>=1.0.0
+
+# Data Processing
+sentencepiece>=0.2.0
+tiktoken>=0.6.0
+
+# Development (optional)
+pytest>=8.0.0
+black>=24.0.0
+ruff>=0.3.0
