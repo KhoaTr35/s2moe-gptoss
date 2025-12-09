@@ -66,6 +66,41 @@ def prepare_model_for_eval(
         device=device,
         dtype=eval_dtype,
     )
+
+    # ADD VERIFICATION HERE
+    print(f"\n3. Verifying loaded weights...")
+    print(f"   Total tensors loaded: {len(loaded_weights)}")
+    
+    # Check weight statistics to confirm not random
+    if len(loaded_weights) > 0:
+        sample_keys = list(loaded_weights.keys())[:3]
+        print(f"\n   Sample weight statistics:")
+        for key in sample_keys:
+            tensor = loaded_weights[key]
+            if isinstance(tensor, torch.Tensor):
+                mean_val = tensor.float().mean().item()
+                std_val = tensor.float().std().item()
+                print(f"     {key}:")
+                print(f"       shape={tuple(tensor.shape)}, mean={mean_val:.6f}, std={std_val:.6f}")
+        
+        # Count specific weight types
+        gate_keys = [k for k in loaded_weights.keys() if 'gate_' in k]
+        lora_keys = [k for k in loaded_weights.keys() if 'lora' in k.lower()]
+        aug_keys = [k for k in loaded_weights.keys() if 'augment' in k.lower()]
+        
+        print(f"\n   Weight categories:")
+        print(f"     Gate weights: {len(gate_keys)}")
+        print(f"     LoRA weights: {len(lora_keys)}")
+        print(f"     Augmentation weights: {len(aug_keys)}")
+        
+        if len(gate_keys) == 0:
+            print("     ⚠️ WARNING: No gate weights found!")
+        if len(lora_keys) == 0:
+            print("     ⚠️ WARNING: No LoRA weights found!")
+    else:
+        print("   ❌ ERROR: No weights loaded from adapter!")
+        raise ValueError(f"Failed to load adapter weights from {adapter_repo_id}")
+    
     
     print("Injecting adapter into base model...")
     model = inject_mixlora_into_gptoss(model, loaded_config, loaded_weights)
