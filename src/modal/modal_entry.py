@@ -142,6 +142,7 @@ if MODAL_AVAILABLE:
     def evaluate_remote(
         tasks: list = None,
         limit: int = None,
+        adapter_repo: str = None,
     ):
         """
         Remote evaluation function on Modal.
@@ -149,6 +150,7 @@ if MODAL_AVAILABLE:
         Args:
             tasks: List of evaluation tasks
             limit: Sample limit per task
+            adapter_repo: HuggingFace adapter repo to load
             
         Returns:
             Evaluation results
@@ -171,6 +173,7 @@ if MODAL_AVAILABLE:
             env_config=env_config,
             tasks=tasks,
             limit=limit,
+            adapter_repo_id=adapter_repo,
         )
         
         return {"status": "success", "results": results}
@@ -182,13 +185,17 @@ if MODAL_AVAILABLE:
         num_samples: int = 17000,
         max_steps: int = -1,
         push_to_hub: bool = True,
+        eval_tasks: str = "arc_easy", # use underscore for modal CLI
+        eval_limit: int = None,
+        adapter_repo: str = "twanghcmut/mixlora-gpt-oss-experimental-run"
     ):
         """
         Local entrypoint for Modal CLI.
         
         Usage:
             modal run src/modal/modal_entry.py --mode train
-            modal run src/modal/modal_entry.py --mode evaluate
+            modal run src/modal/modal_entry.py --mode evaluate --eval-tasks arc_easy
+            modal run src/modal/modal_entry.py --mode evaluate --eval-tasks arc_easy,hellaswag --eval-limit 100
         """
         if mode == "train":
             train_config_dict = {
@@ -205,9 +212,13 @@ if MODAL_AVAILABLE:
             print(f"Training result: {result}")
             
         elif mode == "evaluate":
+            # Parse tasks string to list
+            task_list = [t.strip() for t in eval_tasks.split(",")]
+            
             result = evaluate_remote.remote(
-                tasks=["arc_easy"],
-                limit=10,
+                tasks=task_list,
+                limit=eval_limit,
+                adapter_repo=adapter_repo,
             )
             print(f"Evaluation result: {result}")
         
