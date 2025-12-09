@@ -179,6 +179,78 @@ if MODAL_AVAILABLE:
         return {"status": "success", "results": results}
     
     
+    @app.function(
+        image=image,
+        gpu=GPU_TYPE,
+        volumes={VOLUME_MOUNT_PATH: volume},
+        timeout=TIMEOUT_SECONDS,
+        secrets=[
+            modal.Secret.from_name(HF_SECRET_NAME),
+        ],
+    )
+    def infer_remote(
+        text: str,
+        adapter_repo: str = None,
+        max_new_tokens: int = 128,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        num_samples: int = 1,
+    ):
+        """
+        Remote inference function on Modal.
+        
+        Args:
+            text: Input prompt
+            adapter_repo: HuggingFace adapter repo to load
+            max_new_tokens: Maximum new tokens to generate
+            temperature: Sampling temperature
+            top_p: Top-p sampling
+            num_samples: Number of responses to generate
+            
+        Returns:
+            Generated text(s)
+        """
+        import sys
+        import torch
+        
+        # Setup paths
+        sys.path.insert(0, "/root/project")
+        
+        from configs.env_config import EnvConfig
+        from src.model.infer import generate_text, load_model_for_inference
+        
+        env_config = EnvConfig.from_env()
+        
+        # Use provided adapter repo or default from env
+        if adapter_repo:
+            adapter_repo_id = adapter_repo
+        else:
+            adapter_repo_id = env_config.full_repo_id
+        
+        print(f"Loading model with adapter: {adapter_repo_id}")
+        
+        # Load model
+        model, tokenizer = load_model_for_inference(
+            model_id="openai/gpt-oss-20b",
+            adapter_repo_id=adapter_repo_id,
+            dtype=torch.bfloat16,
+        )
+        
+        # Generate
+        print(f"Generating response for: {text[:50]}...")
+        response = generate_text(
+            prompt=text,
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            num_return_sequences=num_samples,
+        )
+        
+        return {"status": "success", "prompt": text, "response": response}
+    
+    
     @app.local_entrypoint()
     def main(
         mode: str = "train",
@@ -187,7 +259,10 @@ if MODAL_AVAILABLE:
         push_to_hub: bool = True,
         eval_tasks: str = "arc_easy", # use underscore for modal CLI
         eval_limit: int = None,
-        adapter_repo: str = "twanghcmut/mixlora-gpt-oss-experimental-run"
+        adapter_repo: str = "twanghcmut/mixlora-gpt-oss-experimental-run",
+        text: str = None,
+        max_new_tokens: int = 128,
+        temperature: float = 0.7,
     ):
         """
         Local entrypoint for Modal CLI.
@@ -196,6 +271,7 @@ if MODAL_AVAILABLE:
             modal run src/modal/modal_entry.py --mode train
             modal run src/modal/modal_entry.py --mode evaluate --eval-tasks arc_easy
             modal run src/modal/modal_entry.py --mode evaluate --eval-tasks arc_easy,hellaswag --eval-limit 100
+            modal run src/modal/modal_entry.py --mode infer --text "What is AI?"
         """
         if mode == "train":
             train_config_dict = {
@@ -222,8 +298,25 @@ if MODAL_AVAILABLE:
             )
             print(f"Evaluation result: {result}")
         
+        elif mode == "infer":
+            if text is None:
+                print("ERROR: --text is required for inference mode")
+                return
+            
+            result = infer_remote.remote(
+                text=text,
+                adapter_repo=adapter_repo,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+            )
+            print(f"\n{'='*60}")
+            print(f"Prompt: {result['prompt']}")
+            print(f"{'='*60}")
+            print(f"Response:\n{result['response']}")
+            print(f"{'='*60}")
+        
         else:
-            print(f"Unknown mode: {mode}. Use 'train' or 'evaluate'.")
+            print(f"Unknown mode: {mode}. Use 'train', 'evaluate', or 'infer'.")
 
 else:
     # Placeholder functions when Modal is not available
@@ -231,4 +324,7 @@ else:
         raise ImportError("Modal is not installed. Run: pip install modal")
     
     def evaluate_remote(*args, **kwargs):
+        raise ImportError("Modal is not installed. Run: pip install modal")
+    
+    def infer_remote(*args, **kwargs):
         raise ImportError("Modal is not installed. Run: pip install modal")

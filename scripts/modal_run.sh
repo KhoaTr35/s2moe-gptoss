@@ -30,7 +30,10 @@ MODE=${MODE:-"train"}
 NUM_SAMPLES=${NUM_SAMPLES:-17000}
 EVAL_TASKS=${EVAL_TASKS:-"arc_easy"}
 EVAL_LIMIT=${EVAL_LIMIT:-""}
-ADAPTER_REPO=${ADAPTER_REPO:-"twanghcmut/mixlora-gpt-oss-experimental-run"}  # ← NEW DEFAULT
+ADAPTER_REPO=${ADAPTER_REPO:-"twanghcmut/mixlora-gpt-oss-experimental-run"}
+TEXT=${TEXT:-""}
+MAX_NEW_TOKENS=${MAX_NEW_TOKENS:-128}
+TEMPERATURE=${TEMPERATURE:-0.7}
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -51,19 +54,34 @@ while [[ $# -gt 0 ]]; do
             EVAL_LIMIT="$2"
             shift 2
             ;;
-        --adapter-repo)  # ← NEW OPTION
+        --adapter-repo)
             ADAPTER_REPO="$2"
+            shift 2
+            ;;
+        --text)
+            TEXT="$2"
+            shift 2
+            ;;
+        --max-new-tokens)
+            MAX_NEW_TOKENS="$2"
+            shift 2
+            ;;
+        --temperature)
+            TEMPERATURE="$2"
             shift 2
             ;;
         --help|-h)
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
-            echo "  --mode MODE          Mode: train, evaluate, full (default: train)"
+            echo "  --mode MODE          Mode: train, evaluate, infer (default: train)"
             echo "  --num-samples NUM    Number of training samples (default: 17000)"
             echo "  --eval-tasks TASKS   Evaluation tasks (default: arc_easy)"
             echo "  --eval-limit NUM     Limit eval samples (optional)"
             echo "  --adapter-repo REPO  HuggingFace adapter repo (default: twanghcmut/mixlora-gpt-oss-experimental-run)"
+            echo "  --text TEXT          Input text for inference (required for infer mode)"
+            echo "  --max-new-tokens NUM Max tokens to generate (default: 128)"
+            echo "  --temperature TEMP   Temperature for inference (default: 0.7)"
             echo "  --help, -h           Show this help"
             exit 0
             ;;
@@ -80,10 +98,23 @@ echo "==============================================${NC}"
 echo ""
 echo -e "${YELLOW}Configuration:${NC}"
 echo "  Mode: $MODE"
-echo "  Samples: $NUM_SAMPLES"
-echo "  Eval Tasks: $EVAL_TASKS"
-echo "  Eval Limit: ${EVAL_LIMIT:-'all'}"
-echo "  Adapter Repo: $ADAPTER_REPO"  # ← NEW
+
+if [ "$MODE" = "train" ] || [ "$MODE" = "full" ]; then
+    echo "  Samples: $NUM_SAMPLES"
+fi
+
+if [ "$MODE" = "evaluate" ] || [ "$MODE" = "full" ]; then
+    echo "  Eval Tasks: $EVAL_TASKS"
+    echo "  Eval Limit: ${EVAL_LIMIT:-'all'}"
+fi
+
+if [ "$MODE" = "infer" ]; then
+    echo "  Text: \"$TEXT\""
+    echo "  Max Tokens: $MAX_NEW_TOKENS"
+    echo "  Temperature: $TEMPERATURE"
+fi
+
+echo "  Adapter Repo: $ADAPTER_REPO"
 echo ""
 
 # Build Modal command
@@ -99,7 +130,20 @@ if [ "$MODE" = "evaluate" ] || [ "$MODE" = "full" ]; then
     if [ -n "$EVAL_LIMIT" ]; then
         CMD="$CMD --eval-limit $EVAL_LIMIT"
     fi
-    if [ -n "$ADAPTER_REPO" ]; then  # ← NEW
+    if [ -n "$ADAPTER_REPO" ]; then
+        CMD="$CMD --adapter-repo $ADAPTER_REPO"
+    fi
+fi
+
+if [ "$MODE" = "infer" ]; then
+    if [ -z "$TEXT" ]; then
+        echo -e "${RED}ERROR: --text is required for inference mode${NC}"
+        exit 1
+    fi
+    CMD="$CMD --text \"$TEXT\""
+    CMD="$CMD --max-new-tokens $MAX_NEW_TOKENS"
+    CMD="$CMD --temperature $TEMPERATURE"
+    if [ -n "$ADAPTER_REPO" ]; then
         CMD="$CMD --adapter-repo $ADAPTER_REPO"
     fi
 fi
